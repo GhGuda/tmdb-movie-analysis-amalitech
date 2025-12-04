@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import json
+# import logging
+import matplotlib.pyplot as plt
+
 
 #reading json files from raw_data folder
 raw_movies_json_folder = Path('raw_data')
@@ -26,6 +29,12 @@ def extract_name_from_list_of_dict(col, key="name"):
     return np.nan
 
 
+def extract_name_from_dict(col, key="name"):
+    #Function to extract name from a dictionary
+    if isinstance(col, dict):
+        return col.get(key, np.nan)
+    return np.nan
+
 
 def clean_movie_data(df):
     #dropping unwanted columns
@@ -34,7 +43,7 @@ def clean_movie_data(df):
 
 
     # Extracting JSON Columns
-    df['belongs_to_collection'] = df['belongs_to_collection'].apply(lambda name: name.get('name') if isinstance(name, dict) else np.nan)
+    df['belongs_to_collection'] = df['belongs_to_collection'].apply(lambda name: extract_name_from_dict(name))
     df['genres'] = df['genres'].apply(lambda name: extract_name_from_list_of_dict(name))
     df['production_countries'] = df['production_countries'].apply(lambda name: extract_name_from_list_of_dict(name))
     df['production_companies'] = df['production_companies'].apply(lambda name: extract_name_from_list_of_dict(name))
