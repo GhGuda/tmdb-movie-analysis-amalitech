@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import json
-# import logging
+import logging
 import matplotlib.pyplot as plt
 
 
@@ -23,17 +23,25 @@ movies_df.head()
 
 def extract_name_from_list_of_dict(col, key="name"):
     #Function to extract names from a list of dictionaries and join them with '|'
-    if isinstance(col, list):
-        values = [item.get(key, "") for item in col] 
-        return "|".join(values)
-    return np.nan
+    try:
+        if isinstance(col, list):
+            values = [item.get(key, "") for item in col] 
+            return "|".join(values)
+        return np.nan
+    except Exception as e:
+        logging.error(f"Error extracting names from list of dict: {e}")
+        return np.nan
 
 
 def extract_name_from_dict(col, key="name"):
     #Function to extract name from a dictionary
-    if isinstance(col, dict):
-        return col.get(key, np.nan)
-    return np.nan
+    try:
+        if isinstance(col, dict):
+            return col.get(key, np.nan)
+        return np.nan
+    except Exception as e:
+        logging.error(f"Error extracting name from dict: {e}")
+        return np.nan
 
 
 def clean_movie_data(df):
@@ -99,10 +107,15 @@ def clean_movie_data(df):
 
 
 def check_anomalies(df, columns):
-    result = {}
-    for col in columns:
-        result[col] = df[col].value_counts()
-    return result
+    #Function to check for anomalies in specified columns
+    try:
+        result = {}
+        for col in columns:
+            result[col] = df[col].value_counts()
+        return result
+    except Exception as e:
+        logging.error(f"Error checking anomalies: {e}")
+        return {}
 
 #Checking for anomalies and correcting data types    
 columuns_to_check = ['genres', 'spoken_languages', 'production_companies', 'production_countries', 'belongs_to_collection']
