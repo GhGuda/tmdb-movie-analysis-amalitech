@@ -7,9 +7,9 @@ def save_json(data, filepath):
         Path(filepath).parent.mkdir(parents=True, exist_ok=True)
         with open(filepath, "w") as f:
             json.dump(data, f, indent=4)
-        f.close()
     except Exception as e:
         logging.critical(f"Error saving JSON to {filepath}: {e}")
+        return None
 
 def load_json(filepath):
     try:
