@@ -32,7 +32,7 @@ def drop_irrelevant_columns(movies_df):
         logging.error(f"Error: {e}")
         return ""
 
-drop_irrelevant_columns(movies_df)
+movies_df = drop_irrelevant_columns(movies_df)
 
 
 
