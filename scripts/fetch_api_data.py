@@ -13,7 +13,7 @@ movie_ids = [
 ]
 
 def fetch_movie_data(movie_id):
-    url = f"{settings.BASE_URL}{movie_id}?api_key={settings.TMDB_API_KEY}"
+    url = f"{settings.BASE_URL}{movie_id}?api_key={settings.TMDB_API_KEY}&append_to_response=credits"
 
     try:
         response = requests.get(url)
@@ -42,3 +42,7 @@ def run_extraction():
     except Exception as e:
         logging.critical(f"Critical error during data extraction: {e}")
         return pd.DataFrame()
+
+
+if __name__ == "__main__":
+    df = run_extraction()

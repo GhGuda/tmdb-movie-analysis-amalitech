@@ -6,20 +6,25 @@ import logging
 import matplotlib.pyplot as plt
 
 
+
 #reading json files from raw_data folder
-raw_movies_json_folder = Path('raw_data')
-json_files = raw_movies_json_folder.glob('*.json')
+try:
+    raw_movies_json_folder = Path('../raw_data')
+    json_files = raw_movies_json_folder.glob('*.json')
 
-all_movies = []
+    all_movies = []
 
-for file in json_files:
-    with open(file, "r", encoding="utf-8") as f:
-        movie = json.load(f)
-        all_movies.append(movie)
-    f.close()
+    for file in json_files:
+        with open(file, "r", encoding="utf-8") as f:
+            movie = json.load(f)
+            all_movies.append(movie)
 
-movies_df = pd.DataFrame(all_movies)
-movies_df
+    main_movies_df = pd.DataFrame(all_movies)
+    movies_df = main_movies_df.copy()
+except Exception as e:
+    logging.error(f"Error: {e}")
+
+
 
 
 def drop_irrelevant_columns(movies_df):
@@ -30,7 +35,7 @@ def drop_irrelevant_columns(movies_df):
         return movies_df
     except Exception as e:
         logging.error(f"Error: {e}")
-        return ""
+        return "Error occured"
 
 movies_df = drop_irrelevant_columns(movies_df)
 
@@ -55,7 +60,7 @@ def extract_name(value, key="name"):
         return np.nan
     except Exception as e:
         logging.error(f"Error extracting names: {e}")
-        return ""
+        return "Error occured"
 
 
 
@@ -78,7 +83,7 @@ def extracting_name_from_columns(movies_df):
         return movies_df
     except Exception as e:
         logging.error(f"Error extracting names: {e}")
-        return ""
+        return "Error occured"
 
 extracting_name_from_columns(movies_df)
 
@@ -99,7 +104,7 @@ def check_anomalies(movies_df):
         return result
     except Exception as e:
         logging.error(f"Error checking anomalies: {e}")
-        return ""
+        return "Error occured"
         
 
 check_anomalies(movies_df)
@@ -117,7 +122,7 @@ def convert_column_datatypes(movies_df):
         return movies_df
     except Exception as e:
         logging.error(f"Error: {e}")
-        return ""
+        return "Error occured"
         
 convert_column_datatypes(movies_df).head()
 
@@ -125,20 +130,29 @@ convert_column_datatypes(movies_df).head()
 
 
 
+
 def replacing_unrealistic_values(movies_df):
     try:
+        # 1. Replace unrealistic values (budget, revenue, runtime = 0 → NaN)
         for col in ['budget', 'revenue', 'runtime']:
             movies_df[col] = movies_df[col].replace(0, np.nan)
+
+        # 2. Convert budget and revenue to millions
+        movies_df['budget_musd'] = movies_df['budget'] / 1_000_000
+        movies_df['revenue_musd'] = movies_df['revenue'] / 1_000_000
         
+        # 3. Handle vote_count = 0
         movies_df.loc[movies_df['vote_count'] == 0, 'vote_average'] = np.nan
 
+        # 4. Replace overview and tagline placeholders
+        placeholders = ["No Data", "", "N/A", "na", "null"]
         for item in ['overview', 'tagline']:
-            movies_df[item] = movies_df[item].replace(['No Data', 'None', ''], np.nan)
+            movies_df[item] = movies_df[item].replace(placeholders, np.nan)
             
         return movies_df
     except Exception as e:
         logging.error(f"Error: {e}")
-        return ""
+        return "Error occured"
 replacing_unrealistic_values(movies_df).tail()
 
 
@@ -160,19 +174,64 @@ def clean_movies(movies_df):
         return movies_df
     except Exception as e:
         logging.error(f"Error: {e}")
-        return ""
+        return "Error occured"
 clean_movies(movies_df).tail()
 
 
 
 
+def extract_cast_and_crew(df):
+    try:
+        # Extract cast names
+        df["cast"] = df["credits"].apply(
+            lambda x: "|".join([c["name"] for c in x.get("cast", [])]) if isinstance(x, dict) else None
+        )
+
+        # Cast size
+        df["cast_size"] = df["credits"].apply(
+            lambda x: len(x.get("cast", [])) if isinstance(x, dict) else 0
+        )
+
+        # Extract director name(s)
+        df["director"] = df["credits"].apply(
+            lambda x: "|".join([c["name"] for c in x.get("crew", []) if c.get("job") == "Director"])
+            if isinstance(x, dict) else None
+        )
+
+        # Crew size
+        df["crew_size"] = df["credits"].apply(
+            lambda x: len(x.get("crew", [])) if isinstance(x, dict) else 0
+        )
+
+        return df
+    except Exception as e:
+        logging.error(f"Error: {e}")
+        return "Error occured"
+
+extract_cast_and_crew(movies_df)
+
+
+
+
 def reorder_columns(movie_df):
-    ordered_columns = ['id', 'title', 'tagline', 'release_date', 'genres', 'belongs_to_collection',
-                        'original_language', 'budget', 'revenue', 'production_companies',
-                        'production_countries', 'vote_count', 'vote_average', 'popularity',
-                        'runtime', 'overview', 'spoken_languages', 'poster_path']
-    movie_df = movies_df.reindex(columns=ordered_columns)
-    return movie_df
+    try:
+        ordered_columns = [
+            'id', 'title', 'tagline', 'release_date', 'genres', 'belongs_to_collection',
+            'original_language', 'budget_musd', 'revenue_musd', 'production_companies',
+            'production_countries', 'vote_count', 'vote_average', 'popularity',
+            'runtime', 'overview', 'spoken_languages', 'poster_path',
+            'cast', 'cast_size', 'director', 'crew_size'
+        ]
+
+        
+        # Keep only the columns that exist
+        cols_present = [col for col in ordered_columns if col in movie_df.columns]
+        
+        movie_df = movies_df.reindex(columns=cols_present)
+        return movie_df
+    except Exception as e:
+        logging.error(f"Error: {e}")
+        return "Error occured"
 reorder_columns(movies_df).tail()
 
 
@@ -202,30 +261,28 @@ def rank_movies(df, by, top=True, n=10, condition=None, new_col_name=None):
         return ranked
     except Exception as e:
         logging.error(f"Error: {e}")
-        return ""
-
-
+        return "Error occured"
 
 
 
 
 # Highest/Lowest Revenue
-highest_revenue = rank_movies(movies_df, by='revenue', top=True, new_col_name='Highest Revenue')
-lowest_revenue  = rank_movies(movies_df, by='revenue', top=False, new_col_name='Lowest Revenue')
+highest_revenue = rank_movies(movies_df, by='revenue_musd', top=True, new_col_name='Highest Revenue')
+lowest_revenue  = rank_movies(movies_df, by='revenue_musd', top=False, new_col_name='Lowest Revenue')
 highest_revenue[['title', 'revenue']]
 
 # Highest/Lowest Budget
-highest_budget = rank_movies(movies_df, by='budget', top=True, new_col_name='Highest Budget')
-lowest_budget  = rank_movies(movies_df, by='budget', top=False, new_col_name='Lowest Budget')
+highest_budget = rank_movies(movies_df, by='budget_musd', top=True, new_col_name='Highest Budget')
+lowest_budget  = rank_movies(movies_df, by='budget_musd', top=False, new_col_name='Lowest Budget')
 
 # Profit = Revenue - Budget
-movies_df['profit'] = movies_df['revenue'] - movies_df['budget']
+movies_df['profit'] = movies_df['revenue_musd'] - movies_df['budget_musd']
 highest_profit = rank_movies(movies_df, by='profit', top=True, new_col_name='Highest Profit')
 lowest_profit  = rank_movies(movies_df, by='profit', top=False, new_col_name='Lowest Profit')
 
 # ROI = Revenue / Budget, only for Budget ≥ 10M
-roi_condition = lambda df: df['budget'] >= 10_000_000
-movies_df['roi'] = movies_df['revenue'] / movies_df['budget']
+roi_condition = lambda df: df['budget_musd'] >= 10
+movies_df['roi'] = movies_df['revenue_musd'] / movies_df['budget_musd']
 highest_roi = rank_movies(movies_df, by='roi', top=True, condition=roi_condition, new_col_name='Highest ROI')
 lowest_roi  = rank_movies(movies_df, by='roi', top=False, condition=roi_condition, new_col_name='Lowest ROI')
 
@@ -281,10 +338,11 @@ def search_movies(df, title_contains=None, genre=None, year=None, director=None)
 
     except Exception as e:
         logging.error(f"Error: {e}")
-        return ""
+        return "Error occured"
     
 
 search_movies(movies_df, title_contains="Avengers", genre="Action", year=2019)
+
 
 
 
@@ -300,11 +358,14 @@ def best_rated_sci_fi_movies(movies_df):
             movies_df['cast'].str.contains("Bruce Willis", case=False, na=False)
         ].sort_values(by='vote_average', ascending=False)
 
-        return filtered_df
+        if not filtered_df.empty:
+            return filtered_df
+        else:
+            return "No matching query"
 
     except Exception as e:
         logging.error(f"Error: {e}")
-        return ""
+        return "Error occurred"
 
 best_rated_sci_fi_movies(movies_df)
 
@@ -318,12 +379,14 @@ def uma_thurman_tarantino_movies(movies_df):
             movies_df['cast'].str.contains("Uma Thurman", case=False, na=False) &
             movies_df['director'].str.contains("Quentin Tarantino", case=False, na=False)
         ].sort_values(by='runtime', ascending=True)
-
-        return filtered_df
+        if not filtered_df.empty:
+            return filtered_df
+        else:
+            return "No matching query"
 
     except Exception as e:
         logging.error(f"Error: {e}")
-        return ""
+        return "Error occurred"
 
 uma_thurman_tarantino_movies(movies_df)
 
@@ -344,9 +407,9 @@ def franchise_vs_standalone_performance(df, decimals=2):
         summary = (
             df.groupby('franchise_type')
               .agg(
-                  mean_revenue=('revenue', 'mean'),
+                  mean_revenue=('revenue_musd', 'mean'),
                   median_roi=('roi', 'median'),
-                  mean_budget=('budget', 'mean'),
+                  mean_budget=('budget_musd', 'mean'),
                   mean_popularity=('popularity', 'mean'),
                   mean_rating=('vote_average', 'mean')
               )
@@ -359,7 +422,7 @@ def franchise_vs_standalone_performance(df, decimals=2):
 
     except Exception as e:
         logging.error(f"Error: {e}")
-        return ""
+        return "Error occurred"
 
 franchise_vs_standalone_performance(movies_df)
 
@@ -374,10 +437,10 @@ def most_successful_franchises(df):
 
         franchise_stats = franchise_df.groupby('collection_name').agg(
             total_movies=('id', 'count'),
-            total_budget=('budget', 'sum'),
-            mean_budget=('budget', 'mean'),
-            total_revenue=('revenue', 'sum'),
-            mean_revenue=('revenue', 'mean'),
+            total_budget=('budget_musd', 'sum'),
+            mean_budget=('budget_musd', 'mean'),
+            total_revenue=('revenue_musd', 'sum'),
+            mean_revenue=('revenue_musd', 'mean'),
             mean_rating=('vote_average', 'mean')
         ).sort_values(by='mean_revenue', ascending=False)
 
@@ -385,7 +448,7 @@ def most_successful_franchises(df):
 
     except Exception as e:
         logging.error(f"Error: {e}")
-        return ""
+        return "Error occurred"
 most_successful_franchises(movies_df)
 
 
@@ -395,7 +458,7 @@ def most_successful_directors(df):
     try:
         director_stats = df.groupby('director').agg(
             total_movies=('id', 'count'),
-            total_revenue=('revenue', 'sum'),
+            total_revenue=('revenue_musd', 'sum'),
             mean_rating=('vote_average', 'mean')
         ).sort_values(by='total_revenue', ascending=False)
 
@@ -403,80 +466,96 @@ def most_successful_directors(df):
 
     except Exception as e:
         logging.error(f"Error: {e}")
-        return ""
+        return "Error occurred"
+
 most_successful_directors(movies_df)
 
 
 
 
 #Revenue vs Budget Trends
-plt.figure(figsize=(10,6))
-plt.scatter(movies_df['budget'], movies_df['revenue'], alpha=0.7)
-plt.title('Revenue vs Budget')
-plt.xlabel('Budget (USD)')
-plt.ylabel('Revenue (USD)')
-plt.grid(True)
-plt.show()
+try:
+    plt.figure(figsize=(10,6))
+    plt.scatter(movies_df['budget_musd'], movies_df['revenue_musd'], alpha=0.7)
+    plt.title('Revenue vs Budget')
+    plt.xlabel('Budget (USD)')
+    plt.ylabel('Revenue (USD)')
+    plt.grid(True)
+    plt.show()
+except Exception as e:
+    logging.error(f"Error: {e}")
+
 
 
 
 # ROI Distribution by Genere
-# explode genres first
-df_genres = movies_df.copy()
-df_genres['genres'] = df_genres['genres'].str.split('|')
-df_genres = df_genres.explode('genres')
+try:
+    # explode genres first
+    df_genres = movies_df
+    df_genres['genres'] = df_genres['genres'].str.split('|')
+    df_genres = df_genres.explode('genres')
 
-# plot ROI distribution
-plt.figure(figsize=(12,6))
-df_genres.boxplot(column='roi', by='genres', rot=90)
-plt.title("ROI Distribution by Genre")
-plt.suptitle("")
-plt.xlabel("Genre")
-plt.ylabel("ROI")
-plt.show()
+    # plot ROI distribution
+    plt.figure(figsize=(12,6))
+    df_genres.boxplot(column='roi', by='genres', rot=90)
+    plt.title("ROI Distribution by Genre")
+    plt.suptitle("")
+    plt.xlabel("Genre")
+    plt.ylabel("ROI")
+    plt.show()
+
+except Exception as e:
+    logging.error(f"Error: {e}")
 
 
 
 # Popularity vs Rating 
-plt.figure(figsize=(10,6))
-plt.scatter(movies_df['popularity'], movies_df['vote_average'])
-plt.xlabel("Popularity")
-plt.ylabel("Rating (vote_average)")
-plt.title("Popularity vs Rating")
-plt.grid(True)
-plt.show()
-
+try:
+    plt.figure(figsize=(10,6))
+    plt.scatter(movies_df['popularity'], movies_df['vote_average'])
+    plt.xlabel("Popularity")
+    plt.ylabel("Rating (vote_average)")
+    plt.title("Popularity vs Rating")
+    plt.grid(True)
+    plt.show()
+except Exception as e:
+    logging.error(f"Error: {e}")
 
 
 # Yearly Trends in Box Office Performance
 
 #Create a year column
+try:
+    movies_df['year'] = movies_df['release_date'].dt.year
+    yearly = movies_df.groupby('year')['revenue_musd'].sum().reset_index()
 
-movies_df['year'] = movies_df['release_date'].dt.year
-yearly = movies_df.groupby('year')['revenue'].sum().reset_index()
+    #Plot
 
+    plt.figure(figsize=(12,6))
+    plt.plot(yearly['year'], yearly['revenue_musd'])
+    plt.xlabel("Year")
+    plt.ylabel("Total Revenue")
+    plt.title("Yearly Box Office Revenue Trends")
+    plt.grid(True)
+    plt.show()
+except Exception as e:
+    logging.error(f"Error: {e}")
 
-#Plot
-
-plt.figure(figsize=(12,6))
-plt.plot(yearly['year'], yearly['revenue'])
-plt.xlabel("Year")
-plt.ylabel("Total Revenue")
-plt.title("Yearly Box Office Revenue Trends")
-plt.grid(True)
-plt.show()
 
 
 
 
 # Franchise vs Standalone Success
-franchise_stats = movies_df.groupby('franchise_type')[['revenue', 'roi', 'budget']].mean()
-
-plt.figure(figsize=(8,5))
-franchise_stats['roi'].plot(kind='bar')
-plt.title("ROI: Franchise vs Standalone")
-plt.ylabel("ROI")
-plt.grid(True)
-plt.show()
+try:
+    franchise_stats = movies_df.groupby('franchise_type')[['revenue_musd', 'roi', 'budget_musd']].mean()
+    plt.figure(figsize=(8,5))
+    franchise_stats['roi'].plot(kind='bar')
+    plt.title("ROI: Franchise vs Standalone")
+    plt.ylabel("ROI")
+    plt.grid(True)
+    plt.show()
+except Exception as e:
+    logging.error(f"Error: {e}")
+    
 
 
