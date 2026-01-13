@@ -1,0 +1,698 @@
+import pandas as pd
+import numpy as np
+from pathlib import Path
+import json
+import logging
+import matplotlib.pyplot as plt
+
+
+
+def load_movies_from_raw_data(raw_data_dir="../raw_data"):
+    """
+    Load raw TMDB movie JSON files from disk into a pandas DataFrame.
+
+    This function is responsible ONLY for reading raw JSON files
+    that were previously extracted from the TMDB API and saved to disk.
+    No cleaning or transformation is performed here.
+
+    Args:
+        raw_data_dir (str): Relative path to the raw_data directory.
+
+    Returns:
+        pd.DataFrame: DataFrame containing raw movie records.
+                      Returns an empty DataFrame if loading fails.
+    """
+    try:
+        raw_path = Path(raw_data_dir)
+        json_files = raw_path.glob("*.json")
+
+        movies = []
+        for file in json_files:
+            with open(file, "r", encoding="utf-8") as f:
+                movies.append(json.load(f))
+
+        df = pd.DataFrame(movies)
+
+        if df.empty:
+            logging.warning("No movie data found in raw_data folder")
+
+        return df
+
+    except Exception as e:
+        logging.error(f"Failed to load raw movie data: {e}")
+        return pd.DataFrame()
+
+
+
+def drop_irrelevant_columns(movies_df):
+    """
+    Remove columns that are not required for analysis.
+
+    This reduces noise in the dataset and improves clarity for
+    downstream analysis.
+
+    Args:
+        movies_df (pd.DataFrame): Raw movie DataFrame.
+
+    Returns:
+        pd.DataFrame: DataFrame with irrelevant columns removed.
+    """
+    try:
+        drop_columns = [
+            'adult',
+            'imdb_id',
+            'original_title',
+            'video',
+            'homepage'
+        ]
+
+        return movies_df.drop(columns=drop_columns, errors='ignore')
+
+    except Exception as e:
+        logging.error(f"Error dropping irrelevant columns: {e}")
+        return movies_df
+
+
+
+
+def extract_name(value, key="name"):
+    """
+    Extract readable name values from nested TMDB fields.
+
+    TMDB returns many attributes as lists or dictionaries.
+    This helper converts them into pipe-separated strings.
+
+    Args:
+        value (list | dict | str): Raw value from TMDB response.
+        key (str): Dictionary key to extract.
+
+    Returns:
+        str | NaN: Extracted string or NaN if extraction fails.
+    """
+    try:
+        # Already processed (string)
+        if isinstance(value, str):
+            return value
+
+        # List of dictionaries
+        if isinstance(value, list):
+            values = [item.get(key, "") for item in value if isinstance(item, dict)]
+            return "|".join(values)
+
+        # Single dictionary
+        if isinstance(value, dict):
+            return value.get(key, "")
+
+        return np.nan
+
+    except Exception as e:
+        logging.error(f"Error extracting names: {e}")
+        return np.nan
+
+
+
+
+def extracting_name_from_columns(movies_df):
+    """
+    Normalize nested TMDB columns by extracting readable names.
+
+    This function standardizes multiple TMDB fields that contain
+    nested lists or dictionaries.
+
+    Args:
+        movies_df (pd.DataFrame): Movie DataFrame.
+
+    Returns:
+        pd.DataFrame: DataFrame with normalized string columns.
+    """
+    try:
+        columns = [
+            'belongs_to_collection',
+            'genres',
+            'production_countries',
+            'production_companies',
+            'spoken_languages'
+        ]
+
+        for column in columns:
+            if column in movies_df.columns:
+                movies_df[column] = movies_df[column].apply(
+                    lambda value: extract_name(value)
+                )
+
+        return movies_df
+    
+    except Exception as e:
+        logging.error(f"Error extracting names from columns: {e}")
+        return movies_df
+
+
+
+
+def check_anomalies(movies_df):
+    """
+        Inspect high-level value distributions for selected categorical columns.
+
+        This function is intended for exploratory diagnostics and
+        sanity checks during analysis.
+
+        Args:
+            movies_df (pd.DataFrame): Movie DataFrame.
+
+        Returns:
+            dict: Dictionary of value counts per column.
+    """
+    try:
+        columns = [
+            'genres',
+            'spoken_languages',
+            'production_companies',
+            'production_countries',
+            'belongs_to_collection'
+        ]
+        
+        result = {}
+        for col in columns:
+            # value_counts shows the top values including NaN
+            result[col] = [movies_df[col].value_counts()]
+        return result
+    except Exception as e:
+        logging.error(f"Error checking anomalies: {e}")
+        return {}
+        
+
+
+def convert_column_datatypes(movies_df):
+    """
+    Convert numeric and datetime columns to appropriate data types.
+
+    This ensures correct mathematical operations and time-based analysis.
+
+    Args:
+        movies_df (pd.DataFrame): Movie DataFrame.
+
+    Returns:
+        pd.DataFrame: DataFrame with corrected data types.
+    """
+    try:
+        numeric_cols = [
+            'budget',
+            'revenue',
+            'popularity',
+            'id',
+            'vote_count',
+            'vote_average',
+            'runtime'
+        ]
+
+        for col in numeric_cols:
+            if col in movies_df.columns:
+                movies_df[col] = pd.to_numeric(movies_df[col], errors='coerce')
+
+        movies_df['release_date'] = pd.to_datetime(
+            movies_df['release_date'], errors='coerce'
+        )
+
+        return movies_df
+
+    except Exception as e:
+        logging.error(f"Error converting column data types: {e}")
+        return movies_df
+
+
+
+
+def replacing_unrealistic_values(movies_df):
+    """
+    Handle unrealistic or placeholder values and create derived metrics.
+
+    Operations performed:
+    - Replace zero budgets, revenue, runtime with NaN
+    - Convert budget and revenue to millions
+    - Handle zero vote counts
+    - Clean placeholder text fields
+
+    Args:
+        movies_df (pd.DataFrame): Movie DataFrame.
+
+    Returns:
+        pd.DataFrame: Cleaned DataFrame with derived metrics.
+    """
+    try:
+        for col in ['budget', 'revenue', 'runtime']:
+            if col in movies_df.columns:
+                movies_df[col] = movies_df[col].replace(0, np.nan)
+
+        movies_df['budget_musd'] = movies_df['budget'] / 1_000_000
+        movies_df['revenue_musd'] = movies_df['revenue'] / 1_000_000
+
+        movies_df.loc[movies_df['vote_count'] == 0, 'vote_average'] = np.nan
+
+        placeholders = ["No Data", "", "N/A", "na", "null"]
+        for col in ['overview', 'tagline']:
+            if col in movies_df.columns:
+                movies_df[col] = movies_df[col].replace(placeholders, np.nan)
+
+        return movies_df
+
+    except Exception as e:
+        logging.error(f"Error replacing unrealistic values: {e}")
+        return movies_df
+
+
+
+
+def clean_movies(movies_df):
+    """
+    Perform final dataset cleaning and filtering.
+
+    Cleaning rules:
+    - Remove duplicates
+    - Remove rows with missing ID or title
+    - Keep movies with sufficient data completeness
+    - Keep only released movies
+
+    Args:
+        movies_df (pd.DataFrame): Movie DataFrame.
+
+    Returns:
+        pd.DataFrame: Final cleaned dataset.
+    """
+    try:
+        movies_df = (
+            movies_df
+            .drop_duplicates(subset=['id', 'title'])
+            .dropna(subset=['id', 'title'])
+            .dropna(thresh=10)
+        )
+
+        if 'status' in movies_df.columns:
+            movies_df = movies_df[movies_df['status'] == 'Released'].drop(columns=['status'])
+
+        return movies_df
+
+    except Exception as e:
+        logging.error(f"Error cleaning movie dataset: {e}")
+        return movies_df
+
+
+
+
+def extract_cast_and_crew(movies_df):
+    """
+        Extract cast and crew metadata from the TMDB credits field.
+
+        Adds:
+        - cast names
+        - cast size
+        - director name(s)
+        - crew size
+
+        Args:
+            movies_df (pd.DataFrame): Movie DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame enriched with cast and crew features.
+    """
+    try:
+        movies_df["cast"] = movies_df["credits"].apply(
+            lambda x: "|".join([c["name"] for c in x.get("cast", [])]) if isinstance(x, dict) else None
+        )
+
+        movies_df["cast_size"] = movies_df["credits"].apply(
+            lambda x: len(x.get("cast", [])) if isinstance(x, dict) else 0
+        )
+
+        movies_df["director"] = movies_df["credits"].apply(
+            lambda x: "|".join([c["name"] for c in x.get("crew", []) if c.get("job") == "Director"])
+            if isinstance(x, dict) else None
+        )
+
+        movies_df["crew_size"] = movies_df["credits"].apply(
+            lambda x: len(x.get("crew", [])) if isinstance(x, dict) else 0
+        )
+
+        return movies_df
+    except Exception as e:
+        logging.error(f"Error extracting cast and crew data: {e}")
+        return movies_df
+
+
+
+
+def reorder_columns(movies_df):
+    """
+        Reorder columns to improve readability and presentation.
+
+        Args:
+            movies_df (pd.DataFrame): Movie DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame with reordered columns.
+    """
+    try:
+        ordered_columns = [
+            'id', 'title', 'tagline', 'release_date', 'genres',
+            'belongs_to_collection', 'original_language',
+            'budget_musd', 'revenue_musd',
+            'production_companies', 'production_countries',
+            'vote_count', 'vote_average', 'popularity',
+            'runtime', 'overview', 'spoken_languages',
+            'poster_path', 'cast', 'cast_size',
+            'director', 'crew_size'
+        ]
+
+
+        cols_present = [col for col in ordered_columns if col in movies_df.columns]
+
+        return movies_df.reindex(columns=cols_present)
+    
+    except Exception as e:
+        logging.error(f"Error reordering columns: {e}")
+        return movies_df
+
+
+
+
+
+# def rank_movies(df, by, top=True, n=10, condition=None, new_col_name=None):
+#     """
+#     Rank movies based on a column.
+    
+#     Parameters:
+#         df (DataFrame): Movies dataframe
+#         by (str or list): Column(s) to sort by
+#         top (bool): True → highest values, False → lowest
+#         n (int): Number of rows to return
+#         condition (callable, optional): Function to filter df before ranking
+#         new_col_name (str, optional): Add a column to label KPI
+    
+#     Returns:
+#         DataFrame: Top/bottom ranked movies
+#     """
+#     try:
+#         df_filtered = df if condition is None else df[condition(df)]
+#         ranked = df_filtered.sort_values(by=by, ascending=not top).head(n)
+#         if new_col_name:
+#             ranked = ranked.assign(KPI=new_col_name).round(2)
+#         return ranked
+#     except Exception as e:
+#         logging.error(f"Error: {e}")
+#         return "Error occured"
+
+
+
+
+# # Highest/Lowest Revenue
+# highest_revenue = rank_movies(movies_df, by='revenue_musd', top=True, new_col_name='Highest Revenue')
+# lowest_revenue  = rank_movies(movies_df, by='revenue_musd', top=False, new_col_name='Lowest Revenue')
+# highest_revenue[['title', 'revenue']]
+
+# # Highest/Lowest Budget
+# highest_budget = rank_movies(movies_df, by='budget_musd', top=True, new_col_name='Highest Budget')
+# lowest_budget  = rank_movies(movies_df, by='budget_musd', top=False, new_col_name='Lowest Budget')
+
+# # Profit = Revenue - Budget
+# movies_df['profit'] = movies_df['revenue_musd'] - movies_df['budget_musd']
+# highest_profit = rank_movies(movies_df, by='profit', top=True, new_col_name='Highest Profit')
+# lowest_profit  = rank_movies(movies_df, by='profit', top=False, new_col_name='Lowest Profit')
+
+# # ROI = Revenue / Budget, only for Budget ≥ 10M
+# roi_condition = lambda df: df['budget_musd'] >= 10
+# movies_df['roi'] = movies_df['revenue_musd'] / movies_df['budget_musd']
+# highest_roi = rank_movies(movies_df, by='roi', top=True, condition=roi_condition, new_col_name='Highest ROI')
+# lowest_roi  = rank_movies(movies_df, by='roi', top=False, condition=roi_condition, new_col_name='Lowest ROI')
+
+# # Most Voted Movies
+# most_voted = rank_movies(movies_df, by='vote_count', top=True, new_col_name='Most Voted')
+
+# # Highest/Lowest Rated Movies (only movies with ≥ 10 votes)
+# rating_condition = lambda df: df['vote_count'] >= 10
+# highest_rated = rank_movies(movies_df, by='vote_average', top=True, condition=rating_condition, new_col_name='Highest Rated')
+# lowest_rated  = rank_movies(movies_df, by='vote_average', top=False, condition=rating_condition, new_col_name='Lowest Rated')
+
+# # Most Popular Movies
+# most_popular = rank_movies(movies_df, by='popularity', top=True, new_col_name='Most Popular')
+
+
+
+
+
+# all_kpis = pd.concat([
+#     highest_revenue, lowest_revenue, 
+#     highest_budget, lowest_budget,
+#     highest_profit, lowest_profit,
+#     highest_roi, lowest_roi,
+#     most_voted, highest_rated, lowest_rated,
+#     most_popular
+# ], ignore_index=True)
+
+# all_kpis
+
+
+
+
+# def search_movies(df, title_contains=None, genre=None, year=None, director=None):
+#     try:
+#         query = df
+
+#         if title_contains:
+#             query = query[query['title'].str.contains(title_contains, case=False, na=False)]
+
+#         if genre:
+#             query = query[query['genres'].apply(lambda g: genre in g if isinstance(g, list) else False)]
+
+#         if year:
+#             query = query[query['release_date'].dt.year == year]
+
+#         if director:
+#             query = query[query['director'] == director]
+
+#         if query.empty:
+#             return "No matching query"
+
+#         return query
+
+#     except Exception as e:
+#         logging.error(f"Error: {e}")
+#         return "Error occured"
+    
+
+# search_movies(movies_df, title_contains="Avengers", genre="Action", year=2019)
+
+
+
+
+
+
+
+# #Searching for best rated sci-fi action movies starring B.willis
+# def best_rated_sci_fi_movies(movies_df):
+#     try:
+#         filtered_df = movies_df[
+#             movies_df['genres'].str.contains("Science Fiction", case=False, na=False) &
+#             movies_df['genres'].str.contains("Action", case=False, na=False) &
+#             movies_df['cast'].str.contains("Bruce Willis", case=False, na=False)
+#         ].sort_values(by='vote_average', ascending=False)
+
+#         if not filtered_df.empty:
+#             return filtered_df
+#         else:
+#             return "No matching query"
+
+#     except Exception as e:
+#         logging.error(f"Error: {e}")
+#         return "Error occurred"
+
+# best_rated_sci_fi_movies(movies_df)
+
+
+
+
+# #Searching miovies with starring Uma Thurman directed by Quentin Tarantino
+# def uma_thurman_tarantino_movies(movies_df):
+#     try:
+#         filtered_df = movies_df[
+#             movies_df['cast'].str.contains("Uma Thurman", case=False, na=False) &
+#             movies_df['director'].str.contains("Quentin Tarantino", case=False, na=False)
+#         ].sort_values(by='runtime', ascending=True)
+#         if not filtered_df.empty:
+#             return filtered_df
+#         else:
+#             return "No matching query"
+
+#     except Exception as e:
+#         logging.error(f"Error: {e}")
+#         return "Error occurred"
+
+# uma_thurman_tarantino_movies(movies_df)
+
+
+
+
+
+# def franchise_vs_standalone_performance(df, decimals=2):
+#     try:
+#         pd.options.display.float_format = '{:,.2f}'.format
+#         # Create franchise vs standalone indicator
+#         df['franchise_type'] = df['belongs_to_collection'].notna().map({
+#             True: 'Franchise',
+#             False: 'Standalone'
+#         })
+
+#         # Group and aggregate
+#         summary = (
+#             df.groupby('franchise_type')
+#               .agg(
+#                   mean_revenue=('revenue_musd', 'mean'),
+#                   median_roi=('roi', 'median'),
+#                   mean_budget=('budget_musd', 'mean'),
+#                   mean_popularity=('popularity', 'mean'),
+#                   mean_rating=('vote_average', 'mean')
+#               )
+#         )
+
+#         # Sort (Franchise usually higher but just in case)
+#         summary = summary.sort_values(by='mean_revenue', ascending=False)
+
+#         return summary
+
+#     except Exception as e:
+#         logging.error(f"Error: {e}")
+#         return "Error occurred"
+
+# franchise_vs_standalone_performance(movies_df)
+
+
+
+
+
+# def most_successful_franchises(df):
+#     try:
+#         df['collection_name'] = df['belongs_to_collection']
+#         franchise_df = df[df['collection_name'].notna()]
+
+#         franchise_stats = franchise_df.groupby('collection_name').agg(
+#             total_movies=('id', 'count'),
+#             total_budget=('budget_musd', 'sum'),
+#             mean_budget=('budget_musd', 'mean'),
+#             total_revenue=('revenue_musd', 'sum'),
+#             mean_revenue=('revenue_musd', 'mean'),
+#             mean_rating=('vote_average', 'mean')
+#         ).sort_values(by='mean_revenue', ascending=False)
+
+#         return franchise_stats
+
+#     except Exception as e:
+#         logging.error(f"Error: {e}")
+#         return "Error occurred"
+# most_successful_franchises(movies_df)
+
+
+
+
+# def most_successful_directors(df):
+#     try:
+#         director_stats = df.groupby('director').agg(
+#             total_movies=('id', 'count'),
+#             total_revenue=('revenue_musd', 'sum'),
+#             mean_rating=('vote_average', 'mean')
+#         ).sort_values(by='total_revenue', ascending=False)
+
+#         return director_stats
+
+#     except Exception as e:
+#         logging.error(f"Error: {e}")
+#         return "Error occurred"
+
+# most_successful_directors(movies_df)
+
+
+
+
+# #Revenue vs Budget Trends
+# try:
+#     plt.figure(figsize=(10,6))
+#     plt.scatter(movies_df['budget_musd'], movies_df['revenue_musd'], alpha=0.7)
+#     plt.title('Revenue vs Budget')
+#     plt.xlabel('Budget (USD)')
+#     plt.ylabel('Revenue (USD)')
+#     plt.grid(True)
+#     plt.show()
+# except Exception as e:
+#     logging.error(f"Error: {e}")
+
+
+
+
+# # ROI Distribution by Genere
+# try:
+#     # explode genres first
+#     df_genres = movies_df
+#     df_genres['genres'] = df_genres['genres'].str.split('|')
+#     df_genres = df_genres.explode('genres')
+
+#     # plot ROI distribution
+#     plt.figure(figsize=(12,6))
+#     df_genres.boxplot(column='roi', by='genres', rot=90)
+#     plt.title("ROI Distribution by Genre")
+#     plt.suptitle("")
+#     plt.xlabel("Genre")
+#     plt.ylabel("ROI")
+#     plt.show()
+
+# except Exception as e:
+#     logging.error(f"Error: {e}")
+
+
+
+# # Popularity vs Rating 
+# try:
+#     plt.figure(figsize=(10,6))
+#     plt.scatter(movies_df['popularity'], movies_df['vote_average'])
+#     plt.xlabel("Popularity")
+#     plt.ylabel("Rating (vote_average)")
+#     plt.title("Popularity vs Rating")
+#     plt.grid(True)
+#     plt.show()
+# except Exception as e:
+#     logging.error(f"Error: {e}")
+
+
+# # Yearly Trends in Box Office Performance
+
+# #Create a year column
+# try:
+#     movies_df['year'] = movies_df['release_date'].dt.year
+#     yearly = movies_df.groupby('year')['revenue_musd'].sum().reset_index()
+
+#     #Plot
+
+#     plt.figure(figsize=(12,6))
+#     plt.plot(yearly['year'], yearly['revenue_musd'])
+#     plt.xlabel("Year")
+#     plt.ylabel("Total Revenue")
+#     plt.title("Yearly Box Office Revenue Trends")
+#     plt.grid(True)
+#     plt.show()
+# except Exception as e:
+#     logging.error(f"Error: {e}")
+
+
+
+
+
+# # Franchise vs Standalone Success
+# try:
+#     franchise_stats = movies_df.groupby('franchise_type')[['revenue_musd', 'roi', 'budget_musd']].mean()
+#     plt.figure(figsize=(8,5))
+#     franchise_stats['roi'].plot(kind='bar')
+#     plt.title("ROI: Franchise vs Standalone")
+#     plt.ylabel("ROI")
+#     plt.grid(True)
+#     plt.show()
+# except Exception as e:
+#     logging.error(f"Error: {e}")
+    
+
+
