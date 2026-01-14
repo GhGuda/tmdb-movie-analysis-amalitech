@@ -1,4 +1,4 @@
-📊 Final Report: Summary, Methodology & Key Insights
+Final Report: Summary, Methodology & Key Insights
 1. Overview
 
 This project analyzes movie datasets to uncover financial, popularity, and performance trends across the film industry. Using Python, Pandas, and Matplotlib, the workflow covers data cleaning, exploratory analysis, KPI creation, and visualization of budget, revenue, ROI, rating, and genre-based patterns.
@@ -123,5 +123,3 @@ The methodology and visualizations create a framework that can be extended with 
 Revenue prediction
 
 Genre-based clustering
-
-Success classification (Hit vs Flop)

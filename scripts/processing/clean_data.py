@@ -74,7 +74,6 @@ def drop_irrelevant_columns(movies_df):
 
 
 
-
 def extract_name(value, key="name"):
     """
     Extract readable name values from nested TMDB fields.
@@ -108,7 +107,6 @@ def extract_name(value, key="name"):
     except Exception as e:
         logging.error(f"Error extracting names: {e}")
         return np.nan
-
 
 
 
@@ -148,7 +146,6 @@ def extracting_name_from_columns(movies_df):
 
 
 
-
 def check_anomalies(movies_df):
     """
         Inspect high-level value distributions for selected categorical columns.
@@ -179,7 +176,7 @@ def check_anomalies(movies_df):
     except Exception as e:
         logging.error(f"Error checking anomalies: {e}")
         return {}
-        
+       
 
 
 def convert_column_datatypes(movies_df):
@@ -218,7 +215,6 @@ def convert_column_datatypes(movies_df):
     except Exception as e:
         logging.error(f"Error converting column data types: {e}")
         return movies_df
-
 
 
 
@@ -261,7 +257,6 @@ def replacing_unrealistic_values(movies_df):
 
 
 
-
 def clean_movies(movies_df):
     """
     Perform final dataset cleaning and filtering.
@@ -294,7 +289,6 @@ def clean_movies(movies_df):
     except Exception as e:
         logging.error(f"Error cleaning movie dataset: {e}")
         return movies_df
-
 
 
 
@@ -339,7 +333,6 @@ def extract_cast_and_crew(movies_df):
 
 
 
-
 def reorder_columns(movies_df):
     """
         Reorder columns to improve readability and presentation.
@@ -370,243 +363,6 @@ def reorder_columns(movies_df):
     except Exception as e:
         logging.error(f"Error reordering columns: {e}")
         return movies_df
-
-
-
-
-
-# def rank_movies(df, by, top=True, n=10, condition=None, new_col_name=None):
-#     """
-#     Rank movies based on a column.
-    
-#     Parameters:
-#         df (DataFrame): Movies dataframe
-#         by (str or list): Column(s) to sort by
-#         top (bool): True → highest values, False → lowest
-#         n (int): Number of rows to return
-#         condition (callable, optional): Function to filter df before ranking
-#         new_col_name (str, optional): Add a column to label KPI
-    
-#     Returns:
-#         DataFrame: Top/bottom ranked movies
-#     """
-#     try:
-#         df_filtered = df if condition is None else df[condition(df)]
-#         ranked = df_filtered.sort_values(by=by, ascending=not top).head(n)
-#         if new_col_name:
-#             ranked = ranked.assign(KPI=new_col_name).round(2)
-#         return ranked
-#     except Exception as e:
-#         logging.error(f"Error: {e}")
-#         return "Error occured"
-
-
-
-
-# # Highest/Lowest Revenue
-# highest_revenue = rank_movies(movies_df, by='revenue_musd', top=True, new_col_name='Highest Revenue')
-# lowest_revenue  = rank_movies(movies_df, by='revenue_musd', top=False, new_col_name='Lowest Revenue')
-# highest_revenue[['title', 'revenue']]
-
-# # Highest/Lowest Budget
-# highest_budget = rank_movies(movies_df, by='budget_musd', top=True, new_col_name='Highest Budget')
-# lowest_budget  = rank_movies(movies_df, by='budget_musd', top=False, new_col_name='Lowest Budget')
-
-# # Profit = Revenue - Budget
-# movies_df['profit'] = movies_df['revenue_musd'] - movies_df['budget_musd']
-# highest_profit = rank_movies(movies_df, by='profit', top=True, new_col_name='Highest Profit')
-# lowest_profit  = rank_movies(movies_df, by='profit', top=False, new_col_name='Lowest Profit')
-
-# # ROI = Revenue / Budget, only for Budget ≥ 10M
-# roi_condition = lambda df: df['budget_musd'] >= 10
-# movies_df['roi'] = movies_df['revenue_musd'] / movies_df['budget_musd']
-# highest_roi = rank_movies(movies_df, by='roi', top=True, condition=roi_condition, new_col_name='Highest ROI')
-# lowest_roi  = rank_movies(movies_df, by='roi', top=False, condition=roi_condition, new_col_name='Lowest ROI')
-
-# # Most Voted Movies
-# most_voted = rank_movies(movies_df, by='vote_count', top=True, new_col_name='Most Voted')
-
-# # Highest/Lowest Rated Movies (only movies with ≥ 10 votes)
-# rating_condition = lambda df: df['vote_count'] >= 10
-# highest_rated = rank_movies(movies_df, by='vote_average', top=True, condition=rating_condition, new_col_name='Highest Rated')
-# lowest_rated  = rank_movies(movies_df, by='vote_average', top=False, condition=rating_condition, new_col_name='Lowest Rated')
-
-# # Most Popular Movies
-# most_popular = rank_movies(movies_df, by='popularity', top=True, new_col_name='Most Popular')
-
-
-
-
-
-# all_kpis = pd.concat([
-#     highest_revenue, lowest_revenue, 
-#     highest_budget, lowest_budget,
-#     highest_profit, lowest_profit,
-#     highest_roi, lowest_roi,
-#     most_voted, highest_rated, lowest_rated,
-#     most_popular
-# ], ignore_index=True)
-
-# all_kpis
-
-
-
-
-# def search_movies(df, title_contains=None, genre=None, year=None, director=None):
-#     try:
-#         query = df
-
-#         if title_contains:
-#             query = query[query['title'].str.contains(title_contains, case=False, na=False)]
-
-#         if genre:
-#             query = query[query['genres'].apply(lambda g: genre in g if isinstance(g, list) else False)]
-
-#         if year:
-#             query = query[query['release_date'].dt.year == year]
-
-#         if director:
-#             query = query[query['director'] == director]
-
-#         if query.empty:
-#             return "No matching query"
-
-#         return query
-
-#     except Exception as e:
-#         logging.error(f"Error: {e}")
-#         return "Error occured"
-    
-
-# search_movies(movies_df, title_contains="Avengers", genre="Action", year=2019)
-
-
-
-
-
-
-
-# #Searching for best rated sci-fi action movies starring B.willis
-# def best_rated_sci_fi_movies(movies_df):
-#     try:
-#         filtered_df = movies_df[
-#             movies_df['genres'].str.contains("Science Fiction", case=False, na=False) &
-#             movies_df['genres'].str.contains("Action", case=False, na=False) &
-#             movies_df['cast'].str.contains("Bruce Willis", case=False, na=False)
-#         ].sort_values(by='vote_average', ascending=False)
-
-#         if not filtered_df.empty:
-#             return filtered_df
-#         else:
-#             return "No matching query"
-
-#     except Exception as e:
-#         logging.error(f"Error: {e}")
-#         return "Error occurred"
-
-# best_rated_sci_fi_movies(movies_df)
-
-
-
-
-# #Searching miovies with starring Uma Thurman directed by Quentin Tarantino
-# def uma_thurman_tarantino_movies(movies_df):
-#     try:
-#         filtered_df = movies_df[
-#             movies_df['cast'].str.contains("Uma Thurman", case=False, na=False) &
-#             movies_df['director'].str.contains("Quentin Tarantino", case=False, na=False)
-#         ].sort_values(by='runtime', ascending=True)
-#         if not filtered_df.empty:
-#             return filtered_df
-#         else:
-#             return "No matching query"
-
-#     except Exception as e:
-#         logging.error(f"Error: {e}")
-#         return "Error occurred"
-
-# uma_thurman_tarantino_movies(movies_df)
-
-
-
-
-
-# def franchise_vs_standalone_performance(df, decimals=2):
-#     try:
-#         pd.options.display.float_format = '{:,.2f}'.format
-#         # Create franchise vs standalone indicator
-#         df['franchise_type'] = df['belongs_to_collection'].notna().map({
-#             True: 'Franchise',
-#             False: 'Standalone'
-#         })
-
-#         # Group and aggregate
-#         summary = (
-#             df.groupby('franchise_type')
-#               .agg(
-#                   mean_revenue=('revenue_musd', 'mean'),
-#                   median_roi=('roi', 'median'),
-#                   mean_budget=('budget_musd', 'mean'),
-#                   mean_popularity=('popularity', 'mean'),
-#                   mean_rating=('vote_average', 'mean')
-#               )
-#         )
-
-#         # Sort (Franchise usually higher but just in case)
-#         summary = summary.sort_values(by='mean_revenue', ascending=False)
-
-#         return summary
-
-#     except Exception as e:
-#         logging.error(f"Error: {e}")
-#         return "Error occurred"
-
-# franchise_vs_standalone_performance(movies_df)
-
-
-
-
-
-# def most_successful_franchises(df):
-#     try:
-#         df['collection_name'] = df['belongs_to_collection']
-#         franchise_df = df[df['collection_name'].notna()]
-
-#         franchise_stats = franchise_df.groupby('collection_name').agg(
-#             total_movies=('id', 'count'),
-#             total_budget=('budget_musd', 'sum'),
-#             mean_budget=('budget_musd', 'mean'),
-#             total_revenue=('revenue_musd', 'sum'),
-#             mean_revenue=('revenue_musd', 'mean'),
-#             mean_rating=('vote_average', 'mean')
-#         ).sort_values(by='mean_revenue', ascending=False)
-
-#         return franchise_stats
-
-#     except Exception as e:
-#         logging.error(f"Error: {e}")
-#         return "Error occurred"
-# most_successful_franchises(movies_df)
-
-
-
-
-# def most_successful_directors(df):
-#     try:
-#         director_stats = df.groupby('director').agg(
-#             total_movies=('id', 'count'),
-#             total_revenue=('revenue_musd', 'sum'),
-#             mean_rating=('vote_average', 'mean')
-#         ).sort_values(by='total_revenue', ascending=False)
-
-#         return director_stats
-
-#     except Exception as e:
-#         logging.error(f"Error: {e}")
-#         return "Error occurred"
-
-# most_successful_directors(movies_df)
-
 
 
 

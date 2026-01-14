@@ -1,4 +1,3 @@
-from unittest import result
 import pandas as pd
 import logging
 
@@ -28,56 +27,6 @@ def rank_movies(df, by, top=True, n=10, condition=None, new_col_name=None):
     except Exception as e:
         logging.error(f"rank_movies failed: {e}")
         return pd.DataFrame()
-
-
-
-
-# Highest/Lowest Revenue
-# highest_revenue = rank_movies(movies_df, by='revenue_musd', top=True, new_col_name='Highest Revenue')
-# lowest_revenue  = rank_movies(movies_df, by='revenue_musd', top=False, new_col_name='Lowest Revenue')
-# highest_revenue[['title', 'revenue']]
-
-# Highest/Lowest Budget
-# highest_budget = rank_movies(movies_df, by='budget_musd', top=True, new_col_name='Highest Budget')
-# lowest_budget  = rank_movies(movies_df, by='budget_musd', top=False, new_col_name='Lowest Budget')
-
-# Profit = Revenue - Budget
-# movies_df['profit'] = movies_df['revenue_musd'] - movies_df['budget_musd']
-# highest_profit = rank_movies(movies_df, by='profit', top=True, new_col_name='Highest Profit')
-# lowest_profit  = rank_movies(movies_df, by='profit', top=False, new_col_name='Lowest Profit')
-
-# ROI = Revenue / Budget, only for Budget ≥ 10M
-# roi_condition = lambda df: df['budget_musd'] >= 10
-# movies_df['roi'] = movies_df['revenue_musd'] / movies_df['budget_musd']
-# highest_roi = rank_movies(movies_df, by='roi', top=True, condition=roi_condition, new_col_name='Highest ROI')
-# lowest_roi  = rank_movies(movies_df, by='roi', top=False, condition=roi_condition, new_col_name='Lowest ROI')
-
-# Most Voted Movies
-# most_voted = rank_movies(movies_df, by='vote_count', top=True, new_col_name='Most Voted')
-
-# Highest/Lowest Rated Movies (only movies with ≥ 10 votes)
-# rating_condition = lambda df: df['vote_count'] >= 10
-# highest_rated = rank_movies(movies_df, by='vote_average', top=True, condition=rating_condition, new_col_name='Highest Rated')
-# lowest_rated  = rank_movies(movies_df, by='vote_average', top=False, condition=rating_condition, new_col_name='Lowest Rated')
-
-# Most Popular Movies
-# most_popular = rank_movies(movies_df, by='popularity', top=True, new_col_name='Most Popular')
-
-
-
-
-
-# all_kpis = pd.concat([
-#     highest_revenue, lowest_revenue, 
-#     highest_budget, lowest_budget,
-#     highest_profit, lowest_profit,
-#     highest_roi, lowest_roi,
-#     most_voted, highest_rated, lowest_rated,
-#     most_popular
-# ], ignore_index=True)
-
-# all_kpis
-
 
 
 
@@ -119,7 +68,6 @@ def search_movies(df, title_contains=None, genre=None, year=None, director=None)
     except Exception as e:
         logging.error(f"search_movies failed: {e}")
         return pd.DataFrame()
-    
 
 
 
@@ -163,7 +111,6 @@ def franchise_vs_standalone_performance(df):
 
 
 
-
 def most_successful_directors(df):
     """
         Identify directors with highest total revenue.
@@ -191,9 +138,6 @@ def most_successful_directors(df):
     
 
 
-
-
-#Searching for best rated sci-fi action movies starring B.willis
 def best_rated_sci_fi_movies(df):
     """
     Retrieve best-rated Sci-Fi Action movies starring Bruce Willis.
@@ -220,8 +164,6 @@ def best_rated_sci_fi_movies(df):
 
 
 
-
-#Searching miovies with starring Uma Thurman directed by Quentin Tarantino
 def uma_thurman_tarantino_movies(df):
     """
     Retrieve movies starring Uma Thurman directed by Quentin Tarantino.
@@ -276,3 +218,97 @@ def most_successful_franchises(df):
     except Exception as e:
         logging.error(f"most_successful_franchises failed: {e}")
         return pd.DataFrame()
+
+
+
+def get_all_kpis(df, n=10):
+    """
+    Compute all KPIs required for Step 3: KPI Implementation & Analysis.
+
+    Args:
+        df (pd.DataFrame): Analysis-ready movie dataset
+        n (int): Number of records per KPI
+
+    Returns:
+        dict: Dictionary of KPI DataFrames
+    """
+    try:
+        kpis = {}
+
+        # Work on a copy for derived metrics
+        df_kpi = df.copy()
+
+        # --------------------------------------------------
+        # Derived metrics
+        # --------------------------------------------------
+        df_kpi["profit"] = df_kpi["revenue_musd"] - df_kpi["budget_musd"]
+        df_kpi["roi"] = df_kpi["revenue_musd"] / df_kpi["budget_musd"]
+
+        # --------------------------------------------------
+        # KPI conditions
+        # --------------------------------------------------
+        roi_condition = lambda x: x["budget_musd"] >= 10
+        rating_condition = lambda x: x["vote_count"] >= 10
+
+        # --------------------------------------------------
+        # KPI calculations
+        # --------------------------------------------------
+        kpis["highest_revenue"] = rank_movies(
+            df_kpi, by="revenue_musd", top=True, n=n,
+            new_col_name="Highest Revenue"
+        )
+
+        kpis["highest_budget"] = rank_movies(
+            df_kpi, by="budget_musd", top=True, n=n,
+            new_col_name="Highest Budget"
+        )
+
+        kpis["highest_profit"] = rank_movies(
+            df_kpi, by="profit", top=True, n=n,
+            new_col_name="Highest Profit"
+        )
+
+        kpis["lowest_profit"] = rank_movies(
+            df_kpi, by="profit", top=False, n=n,
+            new_col_name="Lowest Profit"
+        )
+
+        kpis["highest_roi"] = rank_movies(
+            df_kpi, by="roi", top=True, n=n,
+            condition=roi_condition,
+            new_col_name="Highest ROI (Budget ≥ 10M)"
+        )
+
+        kpis["lowest_roi"] = rank_movies(
+            df_kpi, by="roi", top=False, n=n,
+            condition=roi_condition,
+            new_col_name="Lowest ROI (Budget ≥ 10M)"
+        )
+
+        kpis["most_voted"] = rank_movies(
+            df_kpi, by="vote_count", top=True, n=n,
+            new_col_name="Most Voted Movies"
+        )
+
+        kpis["highest_rated"] = rank_movies(
+            df_kpi, by="vote_average", top=True, n=n,
+            condition=rating_condition,
+            new_col_name="Highest Rated (≥10 votes)"
+        )
+
+        kpis["lowest_rated"] = rank_movies(
+            df_kpi, by="vote_average", top=False, n=n,
+            condition=rating_condition,
+            new_col_name="Lowest Rated (≥10 votes)"
+        )
+
+        kpis["most_popular"] = rank_movies(
+            df_kpi, by="popularity", top=True, n=n,
+            new_col_name="Most Popular Movies"
+        )
+
+        return kpis
+
+    except Exception as e:
+        logging.error(f"get_all_kpis failed: {e}")
+        return {}
