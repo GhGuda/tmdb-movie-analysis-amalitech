@@ -1,5 +1,6 @@
 import pandas as pd
 import logging
+import numpy as np
 
 
 def rank_movies(df, by, top=True, n=10, condition=None, new_col_name=None):
@@ -28,114 +29,6 @@ def rank_movies(df, by, top=True, n=10, condition=None, new_col_name=None):
         logging.error(f"rank_movies failed: {e}")
         return pd.DataFrame()
 
-
-
-def search_movies(df, title_contains=None, genre=None, year=None, director=None):
-    """
-        Search movies using multiple optional filters.
-
-        Args:
-            df (pd.DataFrame): Analysis-ready dataset.
-            title_contains (str, optional): Partial title match.
-            genre (str, optional): Genre keyword.
-            year (int, optional): Release year.
-            director (str, optional): Director name.
-
-        Returns:
-            pd.DataFrame: Filtered movies.
-    """
-
-    try:
-        query = df.copy()
-
-        if title_contains:
-            query = query[query['title'].str.contains(title_contains, case=False, na=False)]
-
-        if genre:
-            query = query[query['genres'].apply(lambda g: genre in g if isinstance(g, list) else False)]
-
-        if year:
-            query = query[query['release_date'].dt.year == year]
-
-        if director:
-            query = query[query['director'] == director]
-
-        if query.empty:
-            return "No matching query"
-
-        return query
-
-    except Exception as e:
-        logging.error(f"search_movies failed: {e}")
-        return pd.DataFrame()
-
-
-
-def franchise_vs_standalone_performance(df):
-    """
-        Compare performance between franchise and standalone movies.
-
-        Args:
-            df (pd.DataFrame): Analysis-ready dataset.
-
-        Returns:
-            pd.DataFrame: Aggregated performance metrics.
-    """
-
-    try:
-        data = df.copy()
-
-        pd.options.display.float_format = '{:,.2f}'.format
-        data['franchise_type'] = data['belongs_to_collection'].notna().map({
-            True: 'Franchise',
-            False: 'Standalone'
-        })
-
-        summary = (
-            data.groupby('franchise_type')
-              .agg(
-                  mean_revenue=('revenue_musd', 'mean'),
-                  median_roi=('roi', 'median'),
-                  mean_budget=('budget_musd', 'mean'),
-                  mean_popularity=('popularity', 'mean'),
-                  mean_rating=('vote_average', 'mean')
-              ).sort_values(by='mean_revenue', ascending=False)
-
-        )
-
-        return summary
-
-    except Exception as e:
-        logging.error(f"franchise_vs_standalone_performance failed: {e}")
-        return pd.DataFrame()
-
-
-
-def most_successful_directors(df):
-    """
-        Identify directors with highest total revenue.
-
-        Args:
-            df (pd.DataFrame): Analysis-ready dataset.
-
-        Returns:
-            pd.DataFrame: Director-level performance metrics.
-    """
-    try:
-        return (
-            df.groupby("director")
-              .agg(
-                  total_movies=("id", "count"),
-                  total_revenue=("revenue_musd", "sum"),
-                  mean_rating=("vote_average", "mean")
-              )
-              .sort_values("total_revenue", ascending=False)
-        )
-
-    except Exception as e:
-        logging.error(f"most_successful_directors failed: {e}")
-        return pd.DataFrame()
-    
 
 
 def best_rated_sci_fi_movies(df):
@@ -189,6 +82,41 @@ def uma_thurman_tarantino_movies(df):
 
 
 
+def compare_franchise_vs_standalone_performance(df):
+    """
+    Compare franchise vs standalone movie performance.
+
+    Args:
+        df (pd.DataFrame): Analysis-ready movie dataset.
+
+    Returns:
+        pd.DataFrame: Aggregated comparison metrics.
+    """
+    try:
+        data = df.copy()
+
+        data['franchise_type'] = data['belongs_to_collection'].apply(
+            lambda x: 'Franchise' if pd.notna(x) else 'Standalone'
+        )
+        # Calculate ROI safely
+        data["roi"] = (data["revenue_musd"] - data["budget_musd"]) / data["budget_musd"].replace([np.inf, -np.inf], np.nan)
+
+        comparison = data.groupby('franchise_type').agg(
+            mean_revenue=('revenue_musd', 'mean'),
+            median_roi=('roi', 'median'),
+            mean_budget=('budget_musd', 'mean'),
+            mean_popularity=('popularity', 'mean'),
+            mean_rating=('vote_average', 'mean')
+        ).sort_values(by='mean_revenue', ascending=False)
+
+        return comparison
+
+    except Exception as e:
+        logging.error(f"compare_franchise_vs_standalone failed: {e}")
+        return pd.DataFrame()
+    
+    
+
 def most_successful_franchises(df):
     """
     Compute performance metrics for movie franchises.
@@ -221,6 +149,34 @@ def most_successful_franchises(df):
 
 
 
+def most_successful_directors(df):
+    """
+    Compute performance metrics for movie directors.
+
+    Args:
+        df (pd.DataFrame): Analysis-ready movie dataset.
+
+    Returns:
+        pd.DataFrame: Director-level aggregated statistics.
+    """
+    try:
+        data = df.copy()
+        data = data[data['director'].notna()]
+
+        director_stats = data.groupby('director').agg(
+            total_movies=('id', 'count'),
+            total_revenue=('revenue_musd', 'sum'),
+            mean_rating=('vote_average', 'mean')
+        ).sort_values(by='total_revenue', ascending=False)
+
+        return director_stats
+
+    except Exception as e:
+        logging.error(f"most_successful_directors failed: {e}")
+        return pd.DataFrame()
+
+
+
 def get_all_kpis(df, n=10):
     """
     Compute all KPIs required for Step 3: KPI Implementation & Analysis.
@@ -242,7 +198,7 @@ def get_all_kpis(df, n=10):
         # Derived metrics
         # --------------------------------------------------
         df_kpi["profit"] = df_kpi["revenue_musd"] - df_kpi["budget_musd"]
-        df_kpi["roi"] = df_kpi["revenue_musd"] / df_kpi["budget_musd"]
+        df_kpi["roi"] = ((df_kpi["revenue_musd"] - df_kpi["budget_musd"]) / df_kpi["budget_musd"]).replace([np.inf, -np.inf], np.nan)
 
         # --------------------------------------------------
         # KPI conditions
