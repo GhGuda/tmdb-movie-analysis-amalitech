@@ -27,8 +27,6 @@ def run_pipeline():
         print("No data extracted. Pipeline terminated.")
         return movies_df
 
-    print(f"Extraction complete. {len(movies_df)} movies collected.")
-
     # Step 3: Data cleaning and preparation
     movies_df = drop_irrelevant_columns(movies_df)
     movies_df = extracting_name_from_columns(movies_df)

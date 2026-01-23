@@ -3,7 +3,6 @@ import numpy as np
 from pathlib import Path
 import json
 import logging
-import matplotlib.pyplot as plt
 
 
 
@@ -363,92 +362,4 @@ def reorder_columns(movies_df):
     except Exception as e:
         logging.error(f"Error reordering columns: {e}")
         return movies_df
-
-
-
-# #Revenue vs Budget Trends
-# try:
-#     plt.figure(figsize=(10,6))
-#     plt.scatter(movies_df['budget_musd'], movies_df['revenue_musd'], alpha=0.7)
-#     plt.title('Revenue vs Budget')
-#     plt.xlabel('Budget (USD)')
-#     plt.ylabel('Revenue (USD)')
-#     plt.grid(True)
-#     plt.show()
-# except Exception as e:
-#     logging.error(f"Error: {e}")
-
-
-
-
-# # ROI Distribution by Genere
-# try:
-#     # explode genres first
-#     df_genres = movies_df
-#     df_genres['genres'] = df_genres['genres'].str.split('|')
-#     df_genres = df_genres.explode('genres')
-
-#     # plot ROI distribution
-#     plt.figure(figsize=(12,6))
-#     df_genres.boxplot(column='roi', by='genres', rot=90)
-#     plt.title("ROI Distribution by Genre")
-#     plt.suptitle("")
-#     plt.xlabel("Genre")
-#     plt.ylabel("ROI")
-#     plt.show()
-
-# except Exception as e:
-#     logging.error(f"Error: {e}")
-
-
-
-# # Popularity vs Rating 
-# try:
-#     plt.figure(figsize=(10,6))
-#     plt.scatter(movies_df['popularity'], movies_df['vote_average'])
-#     plt.xlabel("Popularity")
-#     plt.ylabel("Rating (vote_average)")
-#     plt.title("Popularity vs Rating")
-#     plt.grid(True)
-#     plt.show()
-# except Exception as e:
-#     logging.error(f"Error: {e}")
-
-
-# # Yearly Trends in Box Office Performance
-
-# #Create a year column
-# try:
-#     movies_df['year'] = movies_df['release_date'].dt.year
-#     yearly = movies_df.groupby('year')['revenue_musd'].sum().reset_index()
-
-#     #Plot
-
-#     plt.figure(figsize=(12,6))
-#     plt.plot(yearly['year'], yearly['revenue_musd'])
-#     plt.xlabel("Year")
-#     plt.ylabel("Total Revenue")
-#     plt.title("Yearly Box Office Revenue Trends")
-#     plt.grid(True)
-#     plt.show()
-# except Exception as e:
-#     logging.error(f"Error: {e}")
-
-
-
-
-
-# # Franchise vs Standalone Success
-# try:
-#     franchise_stats = movies_df.groupby('franchise_type')[['revenue_musd', 'roi', 'budget_musd']].mean()
-#     plt.figure(figsize=(8,5))
-#     franchise_stats['roi'].plot(kind='bar')
-#     plt.title("ROI: Franchise vs Standalone")
-#     plt.ylabel("ROI")
-#     plt.grid(True)
-#     plt.show()
-# except Exception as e:
-#     logging.error(f"Error: {e}")
-    
-
 
