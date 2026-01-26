@@ -26,17 +26,17 @@ def run_pipeline():
     if movies_df.empty:
         print("No data extracted. Pipeline terminated.")
         return movies_df
+    else:
+        # Step 3: Data cleaning and preparation
+        movies_df = drop_irrelevant_columns(movies_df)
+        movies_df = extracting_name_from_columns(movies_df)
+        movies_df = convert_column_datatypes(movies_df)
+        movies_df = replacing_unrealistic_values(movies_df)
+        movies_df = clean_movies(movies_df)
+        movies_df = extract_cast_and_crew(movies_df)
+        movies_df = reorder_columns(movies_df)
 
-    # Step 3: Data cleaning and preparation
-    movies_df = drop_irrelevant_columns(movies_df)
-    movies_df = extracting_name_from_columns(movies_df)
-    movies_df = convert_column_datatypes(movies_df)
-    movies_df = replacing_unrealistic_values(movies_df)
-    movies_df = clean_movies(movies_df)
-    movies_df = extract_cast_and_crew(movies_df)
-    movies_df = reorder_columns(movies_df)
+        print("Pipeline completed successfully.")
 
-    print("Pipeline completed successfully.")
-
-    # Step 4: Return analysis-ready dataset
-    return movies_df
+        # Step 4: Return analysis-ready dataset
+        return movies_df
